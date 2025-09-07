@@ -4,6 +4,7 @@ const { NormalUser } = require("../models/rolesSchema");
 const { generateImageHash } = require("./imageHash");
 const calculateXP = require("./calculateXP");
 const checkAndAwardBadges = require("./awardBadges");
+const recalculateCrowdConfidence = require("./scoring");
 
 const handleBillboardCreation = async (reportData) => {
   try {
@@ -35,36 +36,9 @@ const handleBillboardCreation = async (reportData) => {
 
       await checkAndAwardBadges(reportData.reportedBy, { report: reportData });
       await reportData.save();
-
-      const allReports = await Report.find({ _id: { $in: billboard.reports } });
-
-      let totalWeighted = 0;
-      let totalWeight = 0;
-
-      allReports.forEach((r) => {
-        let baseConf = r.aiAnalysis?.confidence ?? 50;
-
-        // Verification bonus
-        if (
-          ["verified_unauthorized", "verified_authorized"].includes(r.status)
-        ) {
-          baseConf = Math.min(100, baseConf + 30);
-        }
-
-        // Community trust influence
-        const trustScore = Math.max(0, r.communityTrustScore ?? 0);
-        const trustWeight = Math.min(trustScore / 10, 1); // cap at 1 (strong trust = full weight)
-
-        // Weight = 1 (default) + trustWeight
-        const weight = 1 + trustWeight;
-
-        totalWeighted += baseConf * weight;
-        totalWeight += weight;
-      });
-
-      billboard.crowdConfidence =
-        totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : 0;
-
+      billboard.crowdConfidence = await recalculateCrowdConfidence(
+        billboard._id
+      );
       await billboard.save();
     } else {
       // Create new billboard

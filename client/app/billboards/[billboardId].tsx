@@ -55,7 +55,7 @@ const BillBoardDetails = () => {
       typeof item.communityTrustScore === "number"
         ? (item.communityTrustScore * 100).toFixed(2)
         : 0;
-    const thumb = item.annotatedURL || item.imageURL;
+    const thumb = item.annotatedImageURL || item.imageURL;
     const isUp = item.userVote === "upvote";
     const isDown = item.userVote === "downvote";
 
@@ -158,7 +158,7 @@ const BillBoardDetails = () => {
               <Text className="text-sm font-montserrat text-gray-600">
                 Community Trust Score:{" "}
                 <Text className="font-montserratBold text-gray-800">
-                  {communityTrustScore ?? "0.00"}%
+                  {communityTrustScore ?? "0.00"}
                 </Text>
               </Text>
             </View>

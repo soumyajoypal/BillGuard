@@ -10,6 +10,7 @@ const checkAndAwardBadges = require("../utils/awardBadges");
 const calculateXP = require("../utils/calculateXP");
 const { handleBillboardCreation } = require("../utils/billBoardCreation");
 const Billboard = require("../models/billboardSchema");
+const recalculateCrowdConfidence = require("../utils/scoring");
 
 // Admin can get all reports
 const getAllReports = async (req, res) => {
@@ -143,7 +144,7 @@ const createReport = async (req, res) => {
     imageURL: imageURL.trim(),
     annotatedURL: annotatedURL.trim(),
     violationType,
-    location: newLocation, // <- use processed location
+    location: newLocation,
     reportedBy: id,
     ...extraFields,
   };
@@ -251,15 +252,7 @@ const updateReport = async (req, res) => {
     billboard.verifiedAt = new Date();
     await billboard.save();
 
-    // Update crowd confidence
-    const totalReports = billboard.reports.length;
-    const verifiedReports = await Report.countDocuments({
-      _id: { $in: billboard.reports },
-      status: { $in: ["verified_unauthorized", "verified_authorized"] },
-    });
-    billboard.crowdConfidence = Math.round(
-      (verifiedReports / totalReports) * 100
-    );
+    billboard.crowdConfidence = await recalculateCrowdConfidence(billboard._id);
     await billboard.save();
 
     // Update admin stats
@@ -444,31 +437,15 @@ const voteReport = async (req, res) => {
 
     // Recalculate billboard crowd confidence
     if (report.billboard?._id) {
-      const allReports = await Report.find({ billboard: report.billboard._id });
-
-      let totalConfidence = 0;
-      allReports.forEach((r) => {
-        const aiConf = r.aiAnalysis?.confidence ?? 50;
-        const trustScore = Math.max(0, r.communityTrustScore ?? 0);
-
-        // Scale trust effect (0 → no boost, higher trust → stronger boost)
-        const maxTrust = 10; // cap sensitivity
-        const trustWeight = Math.min(trustScore / maxTrust, 1);
-
-        const effectiveConfidence = aiConf * (0.7 + 0.3 * trustWeight); // AI is 70% base, 30% boosted by trust
-
-        totalConfidence += effectiveConfidence;
-      });
-
-      const billboardConfidence = totalConfidence / (allReports.length || 1);
-
-      report.billboard.crowdConfidence = billboardConfidence;
+      report.billboard.crowdConfidence = await recalculateCrowdConfidence(
+        report.billboard._id
+      );
       await report.billboard.save();
 
       return res.status(200).json({
         message: "Vote recorded",
         data: report,
-        billboardConfidence,
+        billboardConfidence: report.billboard.crowdConfidence,
       });
     }
 
