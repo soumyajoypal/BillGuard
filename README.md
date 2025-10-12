@@ -4,6 +4,10 @@ BillGuard is a full-stack application for monitoring and reporting hoarding and 
 
 ---
 
+## **Demo Video**
+[Watch the demo here](https://drive.google.com/file/d/1s7CvGOhHDSSJ9bZrVc8mqTd_kf0Jn_qw/view)
+
+
 ## **Tech Stack**
 
 ### **Client**
